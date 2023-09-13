@@ -147,7 +147,8 @@ contract LendingPool is
             address(stableCoin),
             address(this),
             _amount,
-            0
+            0,
+            totalDebt
         );
 
         // transfer stablecoins
@@ -181,7 +182,8 @@ contract LendingPool is
             address(stableCoin),
             address(this),
             0,
-            _amount
+            _amount,
+            totalDebt
         );
 
         // Calculate maximum amount of stable coins the lender can withdraw
@@ -253,7 +255,8 @@ contract LendingPool is
             address(stableCoin),
             address(this),
             0,
-            _amount
+            _amount,
+            totalDebt
         );
 
         // Accept the debt tokens from the loanRouter.
@@ -295,6 +298,7 @@ interface IInterestRateStrategy {
         address _asset,
         address _poolToken,
         uint256 _liquidityAdded,
-        uint256 _liquidityTaken
-    ) external view returns (uint256, uint256, uint256);
+        uint256 _liquidityTaken,
+        uint256 _totalDebt
+    ) external view returns (uint256, uint256);
 }
