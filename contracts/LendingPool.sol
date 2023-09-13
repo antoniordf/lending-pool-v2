@@ -161,7 +161,7 @@ contract LendingPool is
         // Calculate the proportional number of poolTokens to be minted and mint tokens to lender's address
         uint256 poolTokens = (totalSupply() == 0)
             ? _amount
-            : (_amount * totalSupply()) / address(this).balance;
+            : (_amount * totalSupply()) / stableCoin.balanceOf(address(this));
         _mint(msg.sender, poolTokens);
         emit PoolTokensMinted(msg.sender, poolTokens);
     }
@@ -173,7 +173,7 @@ contract LendingPool is
     function withdraw(uint256 _amount) external whenNotPaused nonReentrant {
         require(_amount > 0, "Amount must be greater than 0");
         require(
-            _amount <= address(this).balance,
+            _amount <= stableCoin.balanceOf(address(this)),
             "Amount exceeds pool balance"
         );
 
@@ -188,12 +188,12 @@ contract LendingPool is
 
         // Calculate maximum amount of stable coins the lender can withdraw
         uint256 maxWithdrawal = (balanceOf(msg.sender) *
-            address(this).balance) / totalSupply();
+            stableCoin.balanceOf(address(this))) / totalSupply();
         require(_amount <= maxWithdrawal, "Withdrawal exceeds allowed amount");
 
         // Calculating how many pool tokens need to be burned
         uint256 requiredPoolTokens = (_amount * totalSupply()) /
-            address(this).balance;
+            stableCoin.balanceOf(address(this));
 
         // Burns the pool tokens directly at the lender's address
         _burn(msg.sender, requiredPoolTokens);
@@ -243,7 +243,7 @@ contract LendingPool is
         uint256 _principalTokenAmount
     ) external onlyLoanRouter whenNotPaused {
         require(
-            _amount <= address(this).balance,
+            _amount <= stableCoin.balanceOf(address(this)),
             "Not enough funds in the pool"
         );
 
