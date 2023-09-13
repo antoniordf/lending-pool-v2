@@ -252,12 +252,12 @@ contract LendingPool is
         emit Borrowed(_borrower, _amount);
     }
 
-    function viewInterestRate() public view {
-        // qtyA: read totalSupply of PoolTokens
-        // qtyB: read total balance of PrincipalTokens (ERC1155) inside this contract (might be challenging without knowing all IDs)
-        // calculate utilisation  (qtyB / qtyA)
-        // utilisation => interest rate
-    }
+    // function viewInterestRate() public view {
+    //     // qtyA: read totalSupply of PoolTokens
+    //     // qtyB: read total balance of PrincipalTokens (ERC1155) inside this contract (might be challenging without knowing all IDs)
+    //     // calculate utilisation  (qtyB / qtyA)
+    //     // utilisation => interest rate
+    // }
 }
 
 /********************************************************************************************/

@@ -105,23 +105,15 @@ contract InterestRateStrategy {
             vars.availableLiquidityPlusDebt =
                 vars.availableLiquidity +
                 vars.totalDebt;
+
             vars.usageRatio = vars.totalDebt.rayDiv(
                 vars.availableLiquidityPlusDebt
             );
         }
 
-        if (vars.usageRatio > OPTIMAL_USAGE_RATIO) {
-            uint256 excessBorrowUsageRatio = (vars.usageRatio -
-                OPTIMAL_USAGE_RATIO).rayDiv(MAX_EXCESS_USAGE_RATIO);
-
-            vars.currentStableBorrowRate +=
-                _stableRateSlope1 +
-                _stableRateSlope2.rayMul(excessBorrowUsageRatio);
-        } else {
-            vars.currentStableBorrowRate += _stableRateSlope1
-                .rayMul(vars.usageRatio)
-                .rayDiv(OPTIMAL_USAGE_RATIO);
-        }
+        vars.currentStableBorrowRate += _stableRateSlope1.rayMul(
+            vars.usageRatio
+        );
 
         vars.currentLiquidityRate = vars
             .currentStableBorrowRate
