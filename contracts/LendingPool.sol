@@ -128,12 +128,8 @@ contract LendingPool is
      * @dev Called by lender to deposit funds into the pool.
      */
 
-    function deposit(
-        uint256 _amount,
-        address _recipient
-    ) external whenNotPaused nonReentrant {
+    function deposit(uint256 _amount) external whenNotPaused nonReentrant {
         require(_amount > 0, "Amount must be greater than 0");
-        require(_recipient != address(0), "Recipient cannot be 0 address");
 
         // Re-calculate the interest rates
         interestRateStrategy.calculateInterestRates(
