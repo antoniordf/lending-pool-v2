@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
@@ -18,6 +19,8 @@ contract LendingPool is
     Pausable,
     OwnableUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     /********************************************************************************************/
     /*                                         OVERRIDES                                        */
     /********************************************************************************************/
@@ -151,17 +154,15 @@ contract LendingPool is
             totalDebt
         );
 
-        // transfer stablecoins
-        require(
-            stableCoin.transferFrom(msg.sender, address(this), _amount),
-            "Transfer failed"
-        );
-        emit Deposited(msg.sender, _amount);
-
         // Calculate the proportional number of poolTokens to be minted and mint tokens to lender's address
         uint256 poolTokens = (totalSupply() == 0)
             ? _amount
             : (_amount * totalSupply()) / stableCoin.balanceOf(address(this));
+
+        // transfer stablecoins
+        stableCoin.safeTransferFrom(msg.sender, address(this), _amount);
+        emit Deposited(msg.sender, _amount);
+
         _mint(msg.sender, poolTokens);
         emit PoolTokensMinted(msg.sender, poolTokens);
     }
@@ -260,20 +261,14 @@ contract LendingPool is
         );
 
         // Accept the debt tokens from the loanRouter.
-        require(
-            principalToken.transferFrom(
-                msg.sender,
-                address(this),
-                _principalTokenAmount
-            ),
-            "Transfer of debt tokens failed"
+        principalToken.safeTransferFrom(
+            msg.sender,
+            address(this),
+            _principalTokenAmount
         );
 
-        // Transfer the requested stableCoin or ETH to the loanRouter.
-        require(
-            stableCoin.transfer(msg.sender, _amount),
-            "StableCoin transfer failed"
-        );
+        // Transfer the requested stableCoin to the loanRouter.
+        stableCoin.safeTransfer(msg.sender, _amount);
         emit Borrowed(_borrower, _amount);
     }
 
