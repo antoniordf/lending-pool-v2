@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 // import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {InterestRateStrategy} from "./InterestRateStrategy.sol";
 
 contract LendingPool is
     ERC20("PoolToken", "PT"),
