@@ -86,7 +86,7 @@ contract InterestRateStrategy {
      * @return variableBorrowRate The variable borrow rate expressed in rays
      */
     function calculateInterestRates(
-        address _reserve,
+        address _asset,
         address _poolToken,
         uint256 _liquidityAdded,
         uint256 _liquidityTaken
@@ -98,7 +98,7 @@ contract InterestRateStrategy {
 
         if (vars.totalDebt != 0) {
             vars.availableLiquidity =
-                IERC20(_reserve).balanceOf(_poolToken) +
+                IERC20(_asset).balanceOf(_poolToken) +
                 _liquidityAdded -
                 _liquidityTaken;
 
