@@ -4,20 +4,42 @@ pragma solidity ^0.8.19;
 // imports
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// import IERC1155 files (interface and receiver)
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/access/Upgradeable.sol";
+// import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract lendingPoolTemplate is
+contract lendingPool is
     ERC20("PoolToken", "PT"),
     ReentrancyGuard,
     Pausable,
-    Ownable,
-    Upgradeable
+    OwnableUpgradeable
 {
+    /********************************************************************************************/
+    /*                                         OVERRIDES                                        */
+    /********************************************************************************************/
+    // Explicitly override conflicting functions
+    function _msgSender()
+        internal
+        view
+        override(Context, ContextUpgradeable)
+        returns (address)
+    {
+        return ContextUpgradeable._msgSender();
+    }
+
+    function _msgData()
+        internal
+        view
+        override(Context, ContextUpgradeable)
+        returns (bytes calldata)
+    {
+        return ContextUpgradeable._msgData();
+    }
+
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
@@ -26,12 +48,22 @@ contract lendingPoolTemplate is
     IERC20 public stableCoin;
 
     // This represents the ERC115 principal token that the loanRouter will swap the stablecoins with
-    // IERC1155 public principalToken
+    IERC1155 public principalToken;
 
     // The loanRouter is the contract that interfaces between the pool and the loan contract.
     address public loanRouter;
 
     // add runningTotalQty uint
+
+    /********************************************************************************************/
+    /*                                       EVENT DEFINITIONS                                  */
+    /********************************************************************************************/
+
+    event Deposited(address indexed user, uint256 amount);
+    event Borrowed(address indexed borrower, uint256 amount);
+    event PoolTokensMinted(address indexed lender, uint256 poolTokens);
+    event Withdrawal(address indexed lender, uint256 amount);
+    event TokenBurned(address indexed lender, uint256 tokenAmount);
 
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
@@ -53,7 +85,25 @@ contract lendingPoolTemplate is
     ) {
         stableCoin = IERC20(_stableCoin);
         loanRouter = _loanRouter;
-        //principalToken = _principalToken
+        principalToken = IERC1155(_principalToken);
+    }
+
+    /********************************************************************************************/
+    /*                                       UTILITY FUNCTIONS                                  */
+    /********************************************************************************************/
+
+    /**
+     * @dev This function allows the owner to set the address of the loanRouter.
+     */
+    function setLoanRouter(address _loanRouter) external onlyOwner {
+        loanRouter = _loanRouter;
+    }
+
+    /**
+     * @dev This function allows the owner to set the address of the principalToken.
+     */
+    function setDebtToken(address _principalToken) external onlyOwner {
+        principalToken = IERC1155(_principalToken);
     }
 
     /********************************************************************************************/
@@ -64,39 +114,109 @@ contract lendingPoolTemplate is
      * @dev Called by lender to deposit funds into the pool.
      */
 
-    function deposit(uint256 _amount, address _recipient) external {
+    function deposit(
+        uint256 _amount,
+        address _recipient
+    ) external whenNotPaused nonReentrant {
+        require(_amount > 0, "Amount must be greater than 0");
+        require(_recipient != address(0), "Recipient cannot be 0 address");
+
         // transfer stablecoins
-        // mint pooltokens to recipient
+        require(
+            stableCoin.transferFrom(msg.sender, address(this), _amount),
+            "Transfer failed"
+        );
+        emit Deposited(msg.sender, _amount);
+
+        // Calculate the proportional number of poolTokens to be minted and mint tokens to lender's address
+        uint256 poolTokens = (totalSupply() == 0)
+            ? _amount
+            : (_amount * totalSupply()) / address(this).balance;
+        _mint(msg.sender, poolTokens);
+        emit PoolTokensMinted(msg.sender, poolTokens);
     }
 
     /**
      * @dev Called by lender to withdraw funds into the pool.
      */
 
-    function withdraw(uint256 _amount) external {
-        // check if amount is within limits (i.e. check reserve-ratio)
-        // if not revert transaction
-        // otherwise
-        // burn msg.sender's pool tokens
-        // calculate appropriate amount of stablecoins to return
+    function withdraw(uint256 _amount) external whenNotPaused nonReentrant {
+        require(_amount > 0, "Amount must be greater than 0");
+        require(
+            _amount <= address(this).balance,
+            "Amount exceeds pool balance"
+        );
+
+        // Calculate maximum amount of stable coins the lender can withdraw
+        uint256 maxWithdrawal = (balanceOf(msg.sender) *
+            address(this).balance) / totalSupply();
+        require(_amount <= maxWithdrawal, "Withdrawal exceeds allowed amount");
+
+        // Calculating how many pool tokens need to be burned
+        uint256 requiredPoolTokens = (_amount * totalSupply()) /
+            address(this).balance;
+
+        // Burns the pool tokens directly at the lender's address
+        _burn(msg.sender, requiredPoolTokens);
+        emit TokenBurned(msg.sender, requiredPoolTokens);
+
+        // transfers stablecoins to caller in proportion to the tokens he sent
+        stableCoin.transfer(msg.sender, _amount);
+        emit Withdrawal(msg.sender, _amount);
     }
 
     /**
-     * @dev Called by anyone to convert principalTokens to stablecoins
+     * @dev This function collects the repayments that the borrower has made to the loan contract.
+     * The function is called by the loan router when the borrower repays loans or interest.
+     * This function calls the collectPayment function in the loan contract.
+     * @param _loanContract The address of the loan contract.
+     * @param _tokenId The ID of the principal token.
      */
+    function collectPayment(
+        address _loanContract,
+        uint256 _tokenId
+    ) external whenNotPaused onlyLoanRouter {
+        // Get the balance of debt tokens held by this contract
+        uint256 principalTokenBalance = principalToken.balanceOf(
+            address(this),
+            _tokenId
+        );
 
-    function collectPayment(uint256 _amount, address _loanContract) external {
-        // call redeem on LoanContract for _amount of PrincipalTokens
+        // Dynamically cast the address of the ILoanContract interface
+        ILoanContract loanContract = ILoanContract(_loanContract);
+
+        // Call the collectPayment function in the loan contract
+        loanContract.redeem(principalTokenBalance);
     }
 
     /**
-     * @dev Called by loanRouter to swap stablecoins for principalTokens
+     * @dev Called by the loanRouter. This function accepts the debt token and sends the borrowed funds to the loanRouter.
      */
+    function borrow(
+        address _borrower,
+        uint256 _notional,
+        uint256 _debtTokenAmount
+    ) external onlyLoanRouter whenNotPaused {
+        require(
+            _notional <= address(this).balance,
+            "Not enough funds in the pool"
+        );
+        // Accept the debt tokens from the loanRouter.
+        require(
+            principalToken.transferFrom(
+                msg.sender,
+                address(this),
+                _debtTokenAmount
+            ),
+            "Transfer of debt tokens failed"
+        );
 
-    function borrow(uint256 _amount, address _recipient) external {
-        // modifier for onlyLoanRouter
-        // check if _amount satisfies reserveRatio
-        // transfer stablecoins to recipient
+        // Transfer the requested stableCoin or ETH to the loanRouter.
+        require(
+            stableCoin.transfer(msg.sender, _notional),
+            "StableCoin transfer failed"
+        );
+        emit Borrowed(_borrower, _notional);
     }
 
     function viewInterestRate() public view {
@@ -105,4 +225,12 @@ contract lendingPoolTemplate is
         // calculate utilisation  (qtyB / qtyA)
         // utilisation => interest rate
     }
+}
+
+/********************************************************************************************/
+/*                                       INTERFACE                                          */
+/********************************************************************************************/
+
+interface ILoanContract {
+    function collectPayment(uint256 debtTokenBalance) external;
 }
