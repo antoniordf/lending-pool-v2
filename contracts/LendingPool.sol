@@ -107,8 +107,17 @@ contract LendingPool is
     /**
      * @dev This function allows the owner to set the address of the principalToken.
      */
-    function setDebtToken(address _principalToken) external onlyOwner {
+    function setPrincipalToken(address _principalToken) external onlyOwner {
         principalToken = IERC1155(_principalToken);
+    }
+
+    /**
+     * @dev This function allows the owner to set the address of the interest rate strategy contract.
+     */
+    function setInterestRateStrategy(
+        address _interestRateStrategy
+    ) external onlyOwner {
+        interestRateStrategy = IInterestRateStrategy(_interestRateStrategy);
     }
 
     /********************************************************************************************/
