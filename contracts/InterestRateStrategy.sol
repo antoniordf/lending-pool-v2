@@ -90,7 +90,7 @@ contract InterestRateStrategy {
         address _poolToken,
         uint256 _liquidityAdded,
         uint256 _liquidityTaken
-    ) public view returns (uint256, uint256, uint256) {
+    ) public view returns (uint256, uint256) {
         CalcInterestRatesLocalVars memory vars;
 
         vars.currentLiquidityRate = 0;
