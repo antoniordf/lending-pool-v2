@@ -132,7 +132,7 @@ contract InterestRateStrategy {
     function riskAdjustedRate(
         bool paysCoupon,
         bool isCollateralInsured
-    ) external pure returns (uint256, uint256, uint256) {
+    ) external pure returns (uint256, uint256) {
         CalcInterestRatesLocalVars memory vars;
 
         uint256 couponPremium = paysCoupon ? 0 : vars.couponPremiumRate;
