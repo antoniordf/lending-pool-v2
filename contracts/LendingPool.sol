@@ -56,6 +56,9 @@ contract LendingPool is
     // The interest rate strategy contract
     IInterestRateStrategy public interestRateStrategy;
 
+    // Variable to keep track of the total debt owed to the pool
+    uint256 public totalDebt;
+
     // add runningTotalQty uint
 
     /********************************************************************************************/
@@ -91,6 +94,7 @@ contract LendingPool is
         loanRouter = _loanRouter;
         principalToken = IERC1155(_principalToken);
         interestRateStrategy = IInterestRateStrategy(_interestRateStrategy);
+        totalDebt = 0;
     }
 
     /********************************************************************************************/
@@ -118,6 +122,13 @@ contract LendingPool is
         address _interestRateStrategy
     ) external onlyOwner {
         interestRateStrategy = IInterestRateStrategy(_interestRateStrategy);
+    }
+
+    /**
+     * @dev This function updates the total debt value by getting the number of principal tokens held by the pool
+     */
+    function updateTotalDebt(uint256 _amount) internal {
+        totalDebt += _amount;
     }
 
     /********************************************************************************************/
@@ -211,6 +222,9 @@ contract LendingPool is
         // Dynamically cast the address of the ILoanContract interface
         ILoanContract loanContract = ILoanContract(_loanContract);
 
+        // Update the total debt value
+        // TODO
+
         // Re-calculate the interest rates
         // TODO
 
@@ -230,6 +244,9 @@ contract LendingPool is
             _amount <= address(this).balance,
             "Not enough funds in the pool"
         );
+
+        // Update the total debt value
+        updateTotalDebt(_amount);
 
         // Re-calculate the interest rates
         interestRateStrategy.calculateInterestRates(
