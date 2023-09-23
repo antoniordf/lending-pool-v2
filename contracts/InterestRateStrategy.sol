@@ -38,7 +38,6 @@ contract InterestRateStrategy {
 
     struct CalcInterestRatesLocalVars {
         uint256 availableLiquidity;
-        uint256 totalDebt;
         uint256 currentStableBorrowRate;
         uint256 currentLiquidityRate;
         uint256 usageRatio;
@@ -83,20 +82,20 @@ contract InterestRateStrategy {
      * @notice Calculates the interest rates depending on the reserve's state and configurations
      * @return liquidityRate The liquidity rate expressed in rays - The liquidity rate is the rate paid to lenders on the protocol
      * @return stableBorrowRate The stable borrow rate expressed in rays
-     * @return variableBorrowRate The variable borrow rate expressed in rays
      */
     function calculateInterestRates(
         address _asset,
         address _poolToken,
         uint256 _liquidityAdded,
-        uint256 _liquidityTaken
-    ) public view returns (uint256, uint256, uint256) {
+        uint256 _liquidityTaken,
+        uint256 _totalDebt
+    ) public view returns (uint256, uint256) {
         CalcInterestRatesLocalVars memory vars;
 
         vars.currentLiquidityRate = 0;
         vars.currentStableBorrowRate = _baseStableBorrowRate;
 
-        if (vars.totalDebt != 0) {
+        if (_totalDebt != 0) {
             vars.availableLiquidity =
                 IERC20(_asset).balanceOf(_poolToken) +
                 _liquidityAdded -
@@ -104,9 +103,9 @@ contract InterestRateStrategy {
 
             vars.availableLiquidityPlusDebt =
                 vars.availableLiquidity +
-                vars.totalDebt;
+                _totalDebt;
 
-            vars.usageRatio = vars.totalDebt.rayDiv(
+            vars.usageRatio = _totalDebt.rayDiv(
                 vars.availableLiquidityPlusDebt
             );
         }
@@ -133,7 +132,7 @@ contract InterestRateStrategy {
     function riskAdjustedRate(
         bool paysCoupon,
         bool isCollateralInsured
-    ) external pure returns (uint256, uint256, uint256) {
+    ) external pure returns (uint256, uint256) {
         CalcInterestRatesLocalVars memory vars;
 
         uint256 couponPremium = paysCoupon ? 0 : vars.couponPremiumRate;
