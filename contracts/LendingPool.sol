@@ -16,32 +16,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 contract LendingPool is
     ERC20("PoolToken", "PT"),
     ReentrancyGuard,
-    Pausable,
     OwnableUpgradeable
 {
     using SafeERC20 for IERC20;
-
-    /********************************************************************************************/
-    /*                                         OVERRIDES                                        */
-    /********************************************************************************************/
-    // Explicitly override conflicting functions
-    function _msgSender()
-        internal
-        view
-        override(Context, ContextUpgradeable)
-        returns (address)
-    {
-        return ContextUpgradeable._msgSender();
-    }
-
-    function _msgData()
-        internal
-        view
-        override(Context, ContextUpgradeable)
-        returns (bytes calldata)
-    {
-        return ContextUpgradeable._msgData();
-    }
 
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
@@ -142,7 +119,7 @@ contract LendingPool is
      * @dev Called by lender to deposit funds into the pool.
      */
 
-    function deposit(uint256 _amount) external whenNotPaused nonReentrant {
+    function deposit(uint256 _amount) external nonReentrant {
         require(_amount > 0, "Amount must be greater than 0");
 
         // Re-calculate the interest rates
@@ -154,24 +131,19 @@ contract LendingPool is
             totalDebt
         );
 
-        // Calculate the proportional number of poolTokens to be minted and mint tokens to lender's address
-        uint256 poolTokens = (totalSupply() == 0)
-            ? _amount
-            : (_amount * totalSupply()) / stableCoin.balanceOf(address(this));
-
         // transfer stablecoins
         stableCoin.safeTransferFrom(msg.sender, address(this), _amount);
         emit Deposited(msg.sender, _amount);
 
-        _mint(msg.sender, poolTokens);
-        emit PoolTokensMinted(msg.sender, poolTokens);
+        _mint(msg.sender, _amount);
+        emit PoolTokensMinted(msg.sender, _amount);
     }
 
     /**
      * @dev Called by lender to withdraw funds into the pool.
      */
 
-    function withdraw(uint256 _amount) external whenNotPaused nonReentrant {
+    function withdraw(uint256 _amount) external nonReentrant {
         require(_amount > 0, "Amount must be greater than 0");
         require(
             _amount <= stableCoin.balanceOf(address(this)),
@@ -187,7 +159,7 @@ contract LendingPool is
             totalDebt
         );
 
-        // Calculate maximum amount of stable coins the lender can withdraw
+        // Calculate maximum amount of stable coins the lender can withdraw - make thismits own view function
         uint256 maxWithdrawal = (balanceOf(msg.sender) *
             stableCoin.balanceOf(address(this))) / totalSupply();
         require(_amount <= maxWithdrawal, "Withdrawal exceeds allowed amount");
@@ -201,7 +173,7 @@ contract LendingPool is
         emit TokenBurned(msg.sender, requiredPoolTokens);
 
         // transfers stablecoins to caller in proportion to the tokens he sent
-        stableCoin.transfer(msg.sender, _amount);
+        stableCoin.safeTransfer(stableCoin, msg.sender, _amount);
         emit Withdrawal(msg.sender, _amount);
     }
 
@@ -214,9 +186,10 @@ contract LendingPool is
      */
     function collectPayment(
         address _loanContract,
-        uint256 _tokenId
-    ) external whenNotPaused onlyLoanRouter {
-        // Get the balance of debt tokens held by this contract
+        uint256 _tokenId,
+        uint256 _amount
+    ) external onlyLoanRouter {
+        // Get the balance of principal tokens held by this contract
         uint256 principalTokenBalance = principalToken.balanceOf(
             address(this),
             _tokenId
@@ -231,8 +204,8 @@ contract LendingPool is
         // Re-calculate the interest rates
         // TODO
 
-        // Call the collectPayment function in the loan contract
-        loanContract.redeem(principalTokenBalance);
+        // Call the collectPayment function in the loan contract - does principal token need approval to be burned?
+        loanContract.redeem(min(principalTokenBalance, _amount));
     }
 
     /**
@@ -242,7 +215,7 @@ contract LendingPool is
         address _borrower,
         uint256 _amount,
         uint256 _principalTokenAmount
-    ) external onlyLoanRouter whenNotPaused {
+    ) external onlyLoanRouter {
         require(
             _amount <= stableCoin.balanceOf(address(this)),
             "Not enough funds in the pool"
@@ -260,15 +233,8 @@ contract LendingPool is
             totalDebt
         );
 
-        // Accept the debt tokens from the loanRouter.
-        principalToken.safeTransferFrom(
-            msg.sender,
-            address(this),
-            _principalTokenAmount
-        );
-
         // Transfer the requested stableCoin to the loanRouter.
-        stableCoin.safeTransfer(msg.sender, _amount);
+        stableCoin.safeTransfer(_borrower, _amount);
         emit Borrowed(_borrower, _amount);
     }
 
